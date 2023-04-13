@@ -8,77 +8,59 @@ deviceId = 0
 cap = cv.VideoCapture(deviceId)
 
 if not cap.isOpened():
-    st.error('Không thể mở camera. Dừng chương trình.')
-    st.stop()
+    st.error('Không thể kết nối tới camera. Vui lòng kiểm tra lại!')
 
-if 'stop' not in st.session_state:
-    st.session_state.stop = False
-    stop = False
+else:
+    st.success('Đã kết nối tới camera!')
 
-press = st.button('Stop')
-if press:
-    if st.session_state.stop == False:
-        st.session_state.stop = True
-        cap.release()
-    else:
-        st.session_state.stop = False
+    def visualize(input, faces, fps, thickness=2):
+        if faces[1] is not None:
+            for idx, face in enumerate(faces[1]):
 
-print('Trạng thái nút Stop', st.session_state.stop)
+                coords = face[:-1].astype(np.int32)
+                cv.rectangle(input, (coords[0], coords[1]), (coords[0]+coords[2], coords[1]+coords[3]), (0, 255, 0), thickness)
+                cv.circle(input, (coords[4], coords[5]), 2, (255, 0, 0), thickness)
+                cv.circle(input, (coords[6], coords[7]), 2, (0, 0, 255), thickness)
+                cv.circle(input, (coords[8], coords[9]), 2, (0, 255, 0), thickness)
+                cv.circle(input, (coords[10], coords[11]), 2, (255, 0, 255), thickness)
+                cv.circle(input, (coords[12], coords[13]), 2, (0, 255, 255), thickness)
+        cv.putText(input, 'FPS: {:.2f}'.format(fps), (1, 16), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-if 'frame_stop' not in st.session_state:
-    frame_stop = cv.imread('stop.jpg')
-    st.session_state.frame_stop = frame_stop
-    print('Đã load stop.jpg')
+    detector = cv.FaceDetectorYN.create(
+        'face_detection_yunet_2022mar.onnx',
+        "",
+        (320, 320),
+        0.9,
+        0.3,
+        5000
+    )
 
-if st.session_state.stop == True:
-    FRAME_WINDOW.image(st.session_state.frame_stop, channels='BGR')
+    tm = cv.TickMeter()
+    frameWidth = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
+    frameHeight = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+    detector.setInputSize([frameWidth, frameHeight])
 
+    while True:
+        hasFrame, frame = cap.read()
+        if not hasFrame:
+            print('No frames grabbed!')
+            break
 
-def visualize(input, faces, fps, thickness=2):
-    if faces[1] is not None:
-        for idx, face in enumerate(faces[1]):
-            coords = face[:-1].astype(np.int32)
-            cv.rectangle(input, (coords[0], coords[1]), (coords[0]+coords[2], coords[1]+coords[3]), (0, 255, 0), thickness)
-            cv.circle(input, (coords[4], coords[5]), 2, (255, 0, 0), thickness)
-            cv.circle(input, (coords[6], coords[7]), 2, (0, 0, 255), thickness)
-            cv.circle(input, (coords[8], coords[9]), 2, (0, 255, 0), thickness)
-            cv.circle(input, (coords[10], coords[11]), 2, (255, 0, 255), thickness)
-            cv.circle(input, (coords[12], coords[13]), 2, (0, 255, 255), thickness)
-    cv.putText(input, 'FPS: {:.2f}'.format(fps), (1, 16), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        frame = cv.resize(frame, (frameWidth, frameHeight))
 
-detector = cv.FaceDetectorYN.create(
-    'face_detection_yunet_2022mar.onnx',
-    "",
-    (320, 320),
-    0.9,
-    0.3,
-    5000
-)
+        # Inference
+        tm.start()
+        faces = detector.detect(frame) # faces is a tuple
+        tm.stop()
 
-tm = cv.TickMeter()
-frameWidth = int(cap.get(cv.CAP_PROP_FRAME_WIDTH))
-frameHeight = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
-detector.setInputSize([frameWidth, frameHeight])
+        # Draw results on the input image
+        visualize(frame, faces, tm.getFPS())
 
-while True:
-    if st.session_state.stop == True:
-        break
-    hasFrame, frame = cap.read()
-    if not hasFrame:
-        st.error('Không thể đọc được frame từ camera. Dừng chương trình.')
-        st.stop()
+        # Visualize results
+        FRAME_WINDOW.image(frame, channels='BGR')
 
-    frame = cv.resize(frame, (frameWidth, frameHeight))
+        if st.button('Stop'):
+            break
 
-    # Inference
-    tm.start()
-    faces = detector.detect(frame) # faces is a tuple
-    tm.stop()
-
-    # Draw results on the input image
-    visualize(frame, faces, tm.getFPS())
-
-    # Visualize results
-    FRAME_WINDOW.image(frame, channels='BGR')
-    
-cap.release
+    cap.release()
+    st.success('Camera đã ngừng kết nối!') 
