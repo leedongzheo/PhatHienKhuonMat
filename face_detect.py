@@ -7,6 +7,9 @@ FRAME_WINDOW = st.image([])
 deviceId = 0
 cap = cv.VideoCapture(deviceId)
 
+if not cap.isOpened():
+    st.error('Không thể mở camera. Dừng chương trình.')
+    st.stop()
 
 if 'stop' not in st.session_state:
     st.session_state.stop = False
@@ -20,7 +23,7 @@ if press:
     else:
         st.session_state.stop = False
 
-print('Trang thai nhan Stop', st.session_state.stop)
+print('Trạng thái nút Stop', st.session_state.stop)
 
 if 'frame_stop' not in st.session_state:
     frame_stop = cv.imread('stop.jpg')
@@ -34,8 +37,6 @@ if st.session_state.stop == True:
 def visualize(input, faces, fps, thickness=2):
     if faces[1] is not None:
         for idx, face in enumerate(faces[1]):
-            # print('Face {}, top-left coordinates: ({:.0f}, {:.0f}), box width: {:.0f}, box height {:.0f}, score: {:.2f}'.format(idx, face[0], face[1], face[2], face[3], face[-1]))
-
             coords = face[:-1].astype(np.int32)
             cv.rectangle(input, (coords[0], coords[1]), (coords[0]+coords[2], coords[1]+coords[3]), (0, 255, 0), thickness)
             cv.circle(input, (coords[4], coords[5]), 2, (255, 0, 0), thickness)
@@ -60,10 +61,12 @@ frameHeight = int(cap.get(cv.CAP_PROP_FRAME_HEIGHT))
 detector.setInputSize([frameWidth, frameHeight])
 
 while True:
+    if st.session_state.stop == True:
+        break
     hasFrame, frame = cap.read()
     if not hasFrame:
-        print('No frames grabbed!')
-        break
+        st.error('Không thể đọc được frame từ camera. Dừng chương trình.')
+        st.stop()
 
     frame = cv.resize(frame, (frameWidth, frameHeight))
 
@@ -77,4 +80,5 @@ while True:
 
     # Visualize results
     FRAME_WINDOW.image(frame, channels='BGR')
-
+    
+cap.release
